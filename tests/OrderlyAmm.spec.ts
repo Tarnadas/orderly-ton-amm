@@ -1,4 +1,4 @@
-import { Blockchain, SandboxContract } from '@ton-community/sandbox';
+import { Blockchain, SandboxContract, TreasuryContract } from '@ton-community/sandbox';
 import { toNano } from 'ton-core';
 import { OrderlyAmm } from '../wrappers/OrderlyAmm';
 import '@ton-community/test-utils';
@@ -6,11 +6,13 @@ import '@ton-community/test-utils';
 describe('OrderlyAmm', () => {
     let blockchain: Blockchain;
     let orderlyAmm: SandboxContract<OrderlyAmm>;
+    let owner: SandboxContract<TreasuryContract>;
 
     beforeEach(async () => {
         blockchain = await Blockchain.create();
+        owner = await blockchain.treasury('owner');
 
-        orderlyAmm = blockchain.openContract(await OrderlyAmm.fromInit(0n));
+        orderlyAmm = blockchain.openContract(await OrderlyAmm.fromInit(owner.address));
 
         const deployer = await blockchain.treasury('deployer');
 
