@@ -1,10 +1,18 @@
-import { Blockchain, SandboxContract, TreasuryContract } from '@ton-community/sandbox';
+import { Blockchain, SandboxContract, TreasuryContract, printTransactionFees } from '@ton-community/sandbox';
 import { SendMode, beginCell, toNano } from 'ton-core';
 import { OrderlyAmm } from '../wrappers/OrderlyAmm';
 import '@ton-community/test-utils';
 import { JettonMaster } from '../wrappers/JettonMaster';
-import { buildOnchainMetadata } from './utils/helpers';
+import {
+    addressToHex,
+    buildOnchainMetadata,
+    depositJetton,
+    mintJetton,
+    prettyLogTransactions,
+    withdrawAllJetton,
+} from './utils/helpers';
 import { JettonWallet } from '../wrappers/JettonWallet';
+import { OrderlyAmmDeposit } from '../wrappers/OrderlyAmmDeposit';
 
 describe('OrderlyAmm', () => {
     let blockchain: Blockchain;
@@ -21,6 +29,11 @@ describe('OrderlyAmm', () => {
 
     beforeEach(async () => {
         blockchain = await Blockchain.create();
+        blockchain.verbosity = {
+            ...blockchain.verbosity,
+            debugLogs: true,
+            print: false,
+        };
         owner = await blockchain.treasury('owner');
 
         orderlyAmm = blockchain.openContract(await OrderlyAmm.fromInit(owner.address));
@@ -35,8 +48,6 @@ describe('OrderlyAmm', () => {
                 toNano(1_000_000_000)
             )
         );
-        ownerJettonA = blockchain.openContract(await JettonWallet.fromInit(tokenA.address, owner.address));
-        orderlyJettonA = blockchain.openContract(await JettonWallet.fromInit(tokenA.address, orderlyAmm.address));
 
         tokenB = blockchain.openContract(
             await JettonMaster.fromInit(
@@ -86,6 +97,12 @@ describe('OrderlyAmm', () => {
             deploy: true,
             success: true,
         });
+        ownerJettonA = blockchain.openContract(
+            JettonWallet.fromAddress(await tokenA.getGetWalletAddress(owner.address))
+        );
+        orderlyJettonA = blockchain.openContract(
+            JettonWallet.fromAddress(await tokenA.getGetWalletAddress(orderlyAmm.address))
+        );
 
         deployResult = await tokenB.send(
             deployer.getSender(),
@@ -103,6 +120,12 @@ describe('OrderlyAmm', () => {
             deploy: true,
             success: true,
         });
+        ownerJettonB = blockchain.openContract(
+            JettonWallet.fromAddress(await tokenB.getGetWalletAddress(owner.address))
+        );
+        orderlyJettonB = blockchain.openContract(
+            JettonWallet.fromAddress(await tokenB.getGetWalletAddress(orderlyAmm.address))
+        );
     });
 
     it('should deploy', async () => {
@@ -110,117 +133,73 @@ describe('OrderlyAmm', () => {
         // blockchain and orderlyAmm are ready to use
     });
 
-    it('should increase counter', async () => {
-        const increaseTimes = 3;
-        for (let i = 0; i < increaseTimes; i++) {
-            console.log(`increase ${i + 1}/${increaseTimes}`);
-
-            const increaser = await blockchain.treasury('increaser' + i);
-
-            const counterBefore = await orderlyAmm.getCounter();
-
-            console.log('counter before increasing', counterBefore);
-
-            const increaseBy = BigInt(Math.floor(Math.random() * 100));
-
-            console.log('increasing by', increaseBy);
-
-            const increaseResult = await orderlyAmm.send(
-                increaser.getSender(),
-                {
-                    value: toNano('0.05'),
-                },
-                {
-                    $$type: 'Add',
-                    queryId: 0n,
-                    amount: increaseBy,
-                }
-            );
-
-            expect(increaseResult.transactions).toHaveTransaction({
-                from: increaser.address,
-                to: orderlyAmm.address,
-                success: true,
-            });
-
-            const counterAfter = await orderlyAmm.getCounter();
-
-            console.log('counter after increasing', counterAfter);
-
-            expect(counterAfter).toBe(counterBefore + increaseBy);
-        }
-    });
-
     it('should receive deposit', async () => {
-        let mintRes = await tokenA.send(
-            owner.getSender(),
-            { value: toNano('1') },
-            {
-                $$type: 'Mint',
-                amount: toNano('100'),
-                receiver: owner.address,
-            }
-        );
+        let mintRes = await mintJetton(tokenA, owner, toNano('100'));
         expect(mintRes.transactions).toHaveTransaction({
             from: tokenA.address,
             to: await tokenA.getGetWalletAddress(owner.address),
             deploy: true,
             success: true,
         });
-        console.log('ownerJettonA', ownerJettonA.address);
-        console.log('await tokenA.getGetWalletAddress(owner.address)', await tokenA.getGetWalletAddress(owner.address));
         expect((await ownerJettonA.getGetWalletData()).balance).toEqual(toNano('100'));
 
-        await tokenB.send(
-            owner.getSender(),
-            { value: toNano('1') },
-            {
-                $$type: 'Mint',
-                amount: toNano('100'),
-                receiver: owner.address,
-            }
-        );
+        mintRes = await mintJetton(tokenB, owner, toNano('100'));
         expect(mintRes.transactions).toHaveTransaction({
-            from: tokenA.address,
-            to: await tokenA.getGetWalletAddress(owner.address),
+            from: tokenB.address,
+            to: await tokenB.getGetWalletAddress(owner.address),
             deploy: true,
             success: true,
         });
         expect((await ownerJettonB.getGetWalletData()).balance).toEqual(toNano('100'));
 
-        const res = await ownerJettonA.send(
-            owner.getSender(),
-            { value: toNano('1') },
-            {
-                $$type: 'TokenTransfer',
-                queryId: 6n,
-                amount: toNano('100'),
-                destination: orderlyAmm.address,
-                response_destination: owner.address,
-                custom_payload: null,
-                forward_ton_amount: toNano('0.5'),
-                forward_payload: beginCell().storeAddress(tokenB.address).storeCoins(toNano('1')).endCell(),
-            }
-        );
-        console.log('res', res);
+        let depositRes = await depositJetton(ownerJettonA, owner, toNano('100'), orderlyAmm);
+        prettyLogTransactions(depositRes.transactions);
+        printTransactionFees(depositRes.transactions);
 
         const ownerWalletDataA = await ownerJettonA.getGetWalletData();
-        console.log('ownerWalletDataA', ownerWalletDataA);
+        expect(ownerWalletDataA.balance).toEqual(0n);
+        const orderlyWalletDataA = await orderlyJettonA.getGetWalletData();
+        expect(orderlyWalletDataA.balance).toEqual(toNano('100'));
 
-        const orderlyWalletDataA = await ownerJettonA.getGetWalletData();
-        console.log('orderlyWalletDataA', orderlyWalletDataA);
+        const ownerDepositA = blockchain.openContract(
+            OrderlyAmmDeposit.fromAddress(await orderlyAmm.getGetDepositAddress(owner.address, orderlyJettonA.address))
+        );
+        const depositDataA = await ownerDepositA.getGetDepositData();
+        expect(depositDataA.balance).toEqual(toNano('100'));
 
-        // jettonA.send(owner.getSender(), {
-        //     value: toNano(0.1),
-        // }, )
-        // const data = await jettonA.ge(orderlyAmm.address);
-        // console.log('DATA', data);
-        // owner.getSender().send({
-        //     to: jettonA.address,
-        //     value: toNano('0.5'),
-        //     bounce: true,
-        //     sendMode: SendMode.CARRY_ALL_REMAINING_INCOMING_VALUE + SendMode.IGNORE_ERRORS,
-        //     body: beginCell()..endCell()
-        // });
+        depositRes = await depositJetton(ownerJettonB, owner, toNano('100'), orderlyAmm);
+        prettyLogTransactions(depositRes.transactions);
+        printTransactionFees(depositRes.transactions);
+
+        const ownerWalletDataB = await ownerJettonB.getGetWalletData();
+        expect(ownerWalletDataB.balance).toEqual(0n);
+        const orderlyWalletDataB = await orderlyJettonB.getGetWalletData();
+        expect(orderlyWalletDataB.balance).toEqual(toNano('100'));
+
+        const ownerDepositB = blockchain.openContract(
+            OrderlyAmmDeposit.fromAddress(await orderlyAmm.getGetDepositAddress(owner.address, orderlyJettonB.address))
+        );
+        const depositDataB = await ownerDepositB.getGetDepositData();
+        expect(depositDataB.balance).toEqual(toNano('100'));
+    });
+
+    it('should deposit and withdraw', async () => {
+        await mintJetton(tokenA, owner, toNano('100'));
+        await mintJetton(tokenB, owner, toNano('100'));
+        await depositJetton(ownerJettonA, owner, toNano('100'), orderlyAmm);
+
+        const ownerDepositA = blockchain.openContract(
+            OrderlyAmmDeposit.fromAddress(await orderlyAmm.getGetDepositAddress(owner.address, orderlyJettonA.address))
+        );
+
+        let depositDataA = await ownerDepositA.getGetDepositData();
+        expect(depositDataA.balance).toEqual(toNano('100'));
+
+        const res = await withdrawAllJetton(ownerDepositA, owner);
+        prettyLogTransactions(res.transactions);
+        printTransactionFees(res.transactions);
+
+        depositDataA = await ownerDepositA.getGetDepositData();
+        expect(depositDataA.balance).toEqual(0n);
     });
 });

@@ -1,123 +1,97 @@
 import "@stdlib/deploy";
 import "@stdlib/ownable";
 import "./message";
-
-message Add {
-    queryId: Int as uint64;
-    amount: Int as uint32;
-}
-
-message Swap {
-    tokenOut: Address;
-    minAmount: Int as coins;
-}
+import "./orderly_amm_deposit";
 
 contract OrderlyAmm with Deployable, Ownable {
     owner: Address;
-    counter: Int as uint32;
     assets: map<Address, Int>;        
+
+    const DEPOSIT: Int = 0;
+    const SWAP: Int = 1;
 
     init(owner: Address) {
         self.owner = owner;
-        self.counter = 0;
         self.assets = emptyMap();
     }
 
-    receive(msg: Add) {
-        self.counter = (self.counter + msg.amount);
+    receive("refund") {}
+
+    receive(msg: WithdrawInternal) {
+        let ctx: Context = context();
+        let stateInit: StateInit = initOf OrderlyAmmDeposit(myAddress(), msg.destination, msg.jetton_wallet);
+        require(contractAddress(stateInit) == ctx.sender, "Invalid sender");
+
+        send(SendParameters {
+            to: msg.jetton_wallet,
+            value: 0,
+            mode: SendRemainingValue,
+            body: TokenTransfer {
+                queryId: msg.queryId,
+                amount: msg.amount,
+                destination: msg.destination,
+                response_destination: ctx.sender,
+                custom_payload: null,
+                forward_ton_amount: 0,
+                forward_payload: emptySlice()
+            }.toCell()
+        });
     }
     
     receive(msg: TokenNotification) {
+        dump("msg.from");
+        // dump(msg.from.asComment());
+        dump(beginCell().storeAddress(msg.from).endCell().hash());
         let ctx: Context = context();
-        let received: Int = msg.amount;
-        
-        // insufficient value to process token
+        dump("ctx.sender");
+        dump(beginCell().storeAddress(ctx.sender).endCell().hash());
+
         if (ctx.value <= ton("0.4")) {
-            self.transferJettonTo(
-                ctx.sender,
-                msg.from,
-                received,
-                msg.queryId,
-                "Insufficient value to process token"
-            );
+            send(SendParameters {
+                to: ctx.sender,
+                value: 0,
+                mode: SendRemainingValue,
+                body: TokenTransfer {
+                    queryId: msg.queryId,
+                    amount: msg.amount,
+                    destination: msg.from,
+                    response_destination: msg.from,
+                    custom_payload: "Insufficient value to process token".asComment(),
+                    forward_ton_amount: 0,
+                    forward_payload: emptySlice()
+                }.toCell()
+            });
             return;
         }
         
-        let swap: Swap = self.readSwap(msg.forward_payload);
-        self.transferJettonTo(
-            ctx.sender,
-            msg.from,
-            received,
-            msg.queryId,
-            "yay"
-        );
-        // let swap: Slice = msg.forward_payload;
-        // if (swap.loadUint(32) != 0x4a2663c4) {
-        //     self.transferJettonTo(ctx.sender, msg.from, received,
-        //         msg.queryId, "Unknown operation");
-        //     return;
-        // }
-        // let other_jetton_master: Address = swap.loadAddress();
-        // let other_jetton_min_expected: Int = swap.loadCoins();
-        
-        // let other_jw: Address = self.jetton_wallets.get(other_jetton_master)!!;
-        // let old_balance_dst: Int = self.assets.get(other_jw)!!;
-        // if (other_jetton_min_expected >= old_balance_dst) {
-        //     self.transferJettonTo(ctx.sender, msg.from, received,
-        //         msg.queryId, "Liquidity pool doesn't have enough funds");
-        //     return;
-        // }
-        // // now, other_jetton_min_expected <= old_balance_dst - 1
-        
-        // let swap_value: Int = self.calc_swap(old_balance_src!!, old_balance_dst, received);
-        // if (swap_value >= old_balance_dst) {  // safeguard against liquidity pool draining
-        //     swap_value = old_balance_dst - 1; // still above other_jetton_min_expected, though we still check this next
-        // }
-        // if (swap_value < other_jetton_min_expected) {
-        //     self.transferJettonTo(ctx.sender, msg.from, received,
-        //         msg.queryId, "Slippage protection: swap can't give requested count of tokens");
-        //     return;
-        // }
-        
-        // self.transferJettonTo(other_jw, msg.from, swap_value, msg.queryId, "Swap completed");
-        // self.assets.set(ctx.sender, old_balance_src!! + received);
-        // self.assets.set(other_jw, old_balance_dst - swap_value);
-        // self.swap_base = self.swap_base + received - swap_value;
-    }
-
-    get fun counter(): Int {
-        return self.counter;
+        let enum: Int = msg.forward_payload.loadUint(8);
+        if (enum == self.DEPOSIT) {
+            let stateInit: StateInit = initOf OrderlyAmmDeposit(myAddress(), msg.from, ctx.sender);
+            send(SendParameters {
+                to: contractAddress(stateInit), 
+                value: 0, 
+                bounce: false,
+                mode: SendRemainingValue + SendIgnoreErrors,
+                body: DepositInternal { 
+                    queryId: msg.queryId,
+                    amount: msg.amount
+                }.toCell(),
+                code: stateInit.code,
+                data: stateInit.data
+            });
+        }
     }
 
     fun readSwap(msg: Slice): Swap {
         return Swap {
+            queryId: msg.loadUint(64),
             tokenOut: msg.loadAddress(),
             minAmount: msg.loadCoins()
         };
     }
 
-    fun transferJettonTo(
-        jetton_wallet: Address,
-        destination: Address,
-        amount: Int,
-        queryId: Int,
-        message: String
-    ) {
-        if (amount > 0) {
-            send(SendParameters {
-                to: jetton_wallet,
-                value: 0,
-                mode: SendRemainingValue,
-                body: TokenTransfer {
-                    queryId: queryId,
-                    amount: amount,
-                    destination: destination,
-                    response_destination: destination,
-                    custom_payload: message.asComment(),
-                    forward_ton_amount: ton("0.000001"),
-                    forward_payload: emptySlice()
-                }.toCell()
-            });
-        }
+    get fun get_deposit_address(owner: Address, jetton_wallet: Address): Address {
+        let stateInit: StateInit = initOf OrderlyAmmDeposit(myAddress(), owner, jetton_wallet);
+        return contractAddress(stateInit);
     }
 }

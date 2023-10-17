@@ -15,8 +15,8 @@ contract JettonWallet with Deployable {
         self.master = master;
     }
 
-    receive(msg: TokenTransfer) { // 0xf8a7ea5
-        let ctx: Context = context(); // Check sender
+    receive(msg: TokenTransfer) {
+        let ctx: Context = context();
         require(ctx.sender == self.owner, "Invalid sender");
 
         // Gas checks
@@ -30,7 +30,7 @@ contract JettonWallet with Deployable {
 
         let stateInit: StateInit = initOf JettonWallet(self.master, msg.destination);  
         let walletAddress: Address = contractAddress(stateInit);
-        send(SendParameters{
+        send(SendParameters {
                 to: walletAddress, 
                 value: 0,
                 mode: SendRemainingValue, 
@@ -53,7 +53,7 @@ contract JettonWallet with Deployable {
 
         if (ctx.sender != self.master) {
             let stateInit: StateInit = initOf JettonWallet(self.master, msg.from);
-            require(contractAddress(stateInit) == ctx.sender, "Invalid sender!");
+            require(contractAddress(stateInit) == ctx.sender, "Invalid sender");
         }
 
         // Update balance
@@ -67,7 +67,7 @@ contract JettonWallet with Deployable {
         
          // 0x7362d09c - notify the new owner of JettonToken that the transfer is complete
         if (msg.forward_ton_amount > 0) { 
-            send(SendParameters{
+            send(SendParameters {
                 to: self.owner,
                 value: msg.forward_ton_amount,
                 mode: SendPayGasSeparately + SendIgnoreErrors,
@@ -143,14 +143,4 @@ contract JettonWallet with Deployable {
             walletCode: (initOf JettonWallet(self.master, self.owner)).code
         };
     }
-    
-    // bounced(msg: Slice) {
-    //     // Parse bounced message
-    //     msg.skipBits(32); // 0xFFFFFFFF 
-    //     let op: Int = msg.loadUint(32);
-    //     let queryId: Int = msg.loadUint(64);
-    //     let jettonAmount: Int = msg.loadCoins();
-    //     require(op == 0x178d4519 || op == 0x7bdd97de, "Invalid bounced message");
-    //     self.balance = self.balance + jettonAmount; // Update balance
-    // }
 }

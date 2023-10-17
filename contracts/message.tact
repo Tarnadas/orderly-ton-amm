@@ -64,3 +64,38 @@ message(0xd53276db) TokenExcesses {
 message TokenUpdateContent {
     content: Cell;
 }
+
+struct OrderlyDepositData {
+    balance: Int;
+    master: Address;
+    owner: Address;
+    jetton_wallet: Address;
+    walletCode: Cell;
+}
+
+message(0x12345678) DepositInternal {
+    queryId: Int as uint64;
+    amount: Int as coins;
+}
+
+message Withdraw {
+    queryId: Int as uint64;
+    amount: Int as coins;
+}
+
+message WithdrawAll {
+    queryId: Int as uint64;
+}
+
+message WithdrawInternal {
+    queryId: Int as uint64;
+    amount: Int as coins;
+    destination: Address;
+    jetton_wallet: Address;
+}
+
+message Swap {
+    queryId: Int as uint64;
+    tokenOut: Address;
+    minAmount: Int as coins;
+}
