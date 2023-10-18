@@ -1,12 +1,14 @@
 import { Blockchain, SandboxContract, TreasuryContract, printTransactionFees } from '@ton-community/sandbox';
 import { SendMode, beginCell, toNano } from 'ton-core';
-import { OrderlyAmm } from '../wrappers/OrderlyAmm';
+import { LiquidityPool, OrderlyAmm, loadLiquidityPool, storeLiquidityPool } from '../wrappers/OrderlyAmm';
 import '@ton-community/test-utils';
 import { JettonMaster } from '../wrappers/JettonMaster';
 import {
     addressToHex,
     buildOnchainMetadata,
+    createLp,
     depositJetton,
+    lpDictionaryToObject,
     mintJetton,
     prettyLogTransactions,
     withdrawAllJetton,
@@ -201,5 +203,23 @@ describe('OrderlyAmm', () => {
 
         depositDataA = await ownerDepositA.getGetDepositData();
         expect(depositDataA.balance).toEqual(0n);
+    });
+
+    it('should create liquidity pool', async () => {
+        const res = await createLp(orderlyAmm, owner, tokenA.address, tokenB.address);
+        prettyLogTransactions(res.transactions);
+        printTransactionFees(res.transactions);
+        const lpAddress = await orderlyAmm.getGetLpAddress(tokenA.address, tokenB.address);
+        const lps = await orderlyAmm.getGetLiquidityPools();
+
+        expect(res.transactions).toHaveTransaction({
+            from: orderlyAmm.address,
+            to: lpAddress,
+            deploy: true,
+            success: true,
+        });
+        expect(lpDictionaryToObject(lps)).toEqual([
+            [0, { $$type: 'LiquidityPool', base: tokenA.address.toRawString(), quote: tokenB.address.toRawString() }],
+        ]);
     });
 });

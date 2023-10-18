@@ -99,3 +99,23 @@ message Swap {
     tokenOut: Address;
     minAmount: Int as coins;
 }
+
+message CreateLp {
+    base: Address;
+    quote: Address;
+}
+
+message CreateLpInternal {
+    base: Address;
+    quote: Address;
+}
+
+message CreateLpSuccessInternal {
+    base: Address;
+    quote: Address;
+}
+
+message LiquidityPool {
+    base: Address;
+    quote: Address;
+}

@@ -2,7 +2,7 @@ import { BlockchainTransaction, SandboxContract, SendMessageResult, TreasuryCont
 import { Address, Cell, Dictionary, beginCell, fromNano, toNano } from 'ton-core';
 import { sha256 } from 'ton-crypto';
 import { JettonWallet } from '../../wrappers/JettonWallet';
-import { OrderlyAmm } from '../../wrappers/OrderlyAmm';
+import { LiquidityPool, OrderlyAmm } from '../../wrappers/OrderlyAmm';
 import { OrderlyAmmDeposit } from '../../wrappers/OrderlyAmmDeposit';
 import { JettonMaster } from '../../wrappers/JettonMaster';
 
@@ -66,6 +66,34 @@ export function withdrawAllJetton(
             queryId: 0n,
         }
     );
+}
+
+export function createLp(
+    amm: SandboxContract<OrderlyAmm>,
+    sender: SandboxContract<TreasuryContract>,
+    base: Address,
+    quote: Address
+): Promise<SendMessageResult> {
+    return amm.send(
+        sender.getSender(),
+        { value: toNano('1') },
+        {
+            $$type: 'CreateLp',
+            base,
+            quote,
+        }
+    );
+}
+
+export function lpDictionaryToObject(dict: Dictionary<number, LiquidityPool>) {
+    return Array.from(dict).map(([index, lp]) => [
+        index,
+        {
+            $$type: 'LiquidityPool',
+            base: lp.base.toRawString(),
+            quote: lp.quote.toRawString(),
+        },
+    ]);
 }
 
 export function prettyLogTransaction(tx: BlockchainTransaction) {

@@ -1,4 +1,5 @@
 import "@stdlib/deploy";
+
 import "./message";
 
 contract OrderlyAmmDeposit with Deployable {
@@ -21,6 +22,7 @@ contract OrderlyAmmDeposit with Deployable {
     }
 
     receive(msg: DepositInternal) {
+        dump("DepositInternal");
         let ctx: Context = context();
         require(ctx.sender == self.master, "Invalid sender");
 
@@ -31,6 +33,7 @@ contract OrderlyAmmDeposit with Deployable {
     }
 
     receive(msg: Withdraw) {
+        dump("Withdraw");
         let ctx: Context = context();
         require(ctx.sender == self.owner, "Invalid sender");
 
@@ -52,6 +55,7 @@ contract OrderlyAmmDeposit with Deployable {
     }
 
     receive(msg: WithdrawAll) {
+        dump("WithdrawAll");
         let ctx: Context = context();
         require(ctx.sender == self.owner, "Invalid sender");
 
