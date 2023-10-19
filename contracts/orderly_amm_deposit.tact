@@ -34,7 +34,7 @@ contract OrderlyAmmDeposit with Deployable {
             value: 0,
             bounce: false,
             mode: SendRemainingValue + SendIgnoreErrors,
-            body: emptyCell()
+            body: TokenExcesses { queryId: 0 }.toCell()
         });
     }
 
@@ -123,7 +123,7 @@ contract OrderlyAmmDeposit with Deployable {
         //     value: 0,
         //     bounce: false,
         //     mode: SendRemainingValue + SendIgnoreErrors,
-        //     body: emptyCell()
+        //     body: TokenExcesses { queryId: 0 }.toCell()
         // });
     }
 

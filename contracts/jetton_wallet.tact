@@ -49,7 +49,8 @@ contract JettonWallet with Deployable {
             });
     }
 
-    receive(msg: TokenTransferInternal) { // 0x178d4519
+    receive(msg: TokenTransferInternal) {
+        dump("TokenTransferInternal");
         let ctx: Context = context();
 
         if (ctx.sender != self.master) {
@@ -66,7 +67,6 @@ contract JettonWallet with Deployable {
         let fwdFee: Int = ctx.readForwardFee();
         msgValue = msgValue - msg.forward_ton_amount - fwdFee;
         
-         // 0x7362d09c - notify the new owner of JettonToken that the transfer is complete
         if (msg.forward_ton_amount > 0) { 
             send(SendParameters {
                 to: self.owner,
@@ -82,7 +82,6 @@ contract JettonWallet with Deployable {
             });
         }
 
-        // 0xd53276db -- Cashback to the original Sender
         if (msg.response_destination != null) { 
             send(SendParameters {
                 to: msg.response_destination, 
@@ -98,15 +97,14 @@ contract JettonWallet with Deployable {
 
     receive(msg: TokenBurn) {
         let ctx: Context = context();
-        require(ctx.sender == self.owner, "Invalid sender");  // Check sender
+        require(ctx.sender == self.owner, "Invalid sender");
 
-        self.balance = self.balance - msg.amount; // Update balance
+        self.balance = self.balance - msg.amount;
         require(self.balance >= 0, "Invalid balance");
 
-        let fwdFee: Int = ctx.readForwardFee(); // Gas checks
+        let fwdFee: Int = ctx.readForwardFee();
         require(ctx.value > fwdFee + 2 * self.gasConsumption + self.minTonsForStorage, "Invalid value - Burn");
 
-        // Burn tokens
         send(SendParameters{  
             to: self.master,
             value: 0,

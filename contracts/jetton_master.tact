@@ -18,7 +18,26 @@ contract JettonMaster with Deployable {
         dump("Mint");
         let ctx: Context = context();
         require(ctx.sender == self.owner, "Not Owner");
-        self.mint(msg.receiver, msg.amount, self.owner); // TODO gas refund
+
+        self.totalSupply = self.totalSupply + msg.amount;
+
+        let stateInit: StateInit = self.getJettonWalletInit(msg.receiver);
+        send(SendParameters{
+            to: contractAddress(stateInit), 
+            value: 0, 
+            bounce: true,
+            mode: SendRemainingValue,
+            body: TokenTransferInternal { 
+                queryId: 0,
+                amount: msg.amount,
+                from: myAddress(),
+                response_destination: msg.responseDestination,
+                forward_ton_amount: 0,
+                forward_payload: emptySlice()
+            }.toCell(),
+            code: stateInit.code,
+            data: stateInit.data
+        });
     }
 
     receive(msg: TokenUpdateContent) {
@@ -41,43 +60,16 @@ contract JettonMaster with Deployable {
         }
     }
 
-    // Private Methods // 
-    // @to The Address receive the Jetton token after minting
-    // @amount The amount of Jetton token being minted
-    // @response_destination The previous owner address
-    fun mint(to: Address, amount: Int, response_destination: Address) {
-        self.totalSupply = self.totalSupply + amount; // Update total supply
-
-        let winit: StateInit = self.getJettonWalletInit(to); // Create message
-        send(SendParameters{
-            to: contractAddress(winit), 
-            value: 0, 
-            bounce: true,
-            mode: SendRemainingValue,
-            body: TokenTransferInternal { 
-                queryId: 0,
-                amount: amount,
-                from: myAddress(),
-                response_destination: response_destination,
-                forward_ton_amount: 0,
-                forward_payload: emptySlice()
-            }.toCell(),
-            code: winit.code,
-            data: winit.data
-        });
-    }
-
     fun requireSenderAsWalletOwner(owner: Address) {
         let ctx: Context = context();
-        let winit: StateInit = self.getJettonWalletInit(owner);
-        require(contractAddress(winit) == ctx.sender, "Invalid sender");
+        let stateInit: StateInit = self.getJettonWalletInit(owner);
+        require(contractAddress(stateInit) == ctx.sender, "Invalid sender");
     }
 
     fun getJettonWalletInit(address: Address): StateInit {
         return initOf JettonWallet(myAddress(), address);
     }
 
-    // ====== Get Methods ====== //
     get fun get_jetton_data(): JettonData {
         let code: Cell = self.getJettonWalletInit(myAddress()).code;
         return JettonData { 
@@ -90,7 +82,7 @@ contract JettonMaster with Deployable {
     }
 
     get fun get_wallet_address(owner: Address): Address {
-        let winit: StateInit = self.getJettonWalletInit(owner);
-        return contractAddress(winit);
+        let stateInit: StateInit = self.getJettonWalletInit(owner);
+        return contractAddress(stateInit);
     }
 } 

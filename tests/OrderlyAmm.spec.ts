@@ -4,6 +4,7 @@ import { LiquidityPool, OrderlyAmm, loadLiquidityPool, storeLiquidityPool } from
 import '@ton-community/test-utils';
 import { JettonMaster } from '../wrappers/JettonMaster';
 import {
+    addLiquidity,
     addressToHex,
     buildOnchainMetadata,
     createLp,
@@ -15,6 +16,7 @@ import {
 } from './utils/helpers';
 import { JettonWallet } from '../wrappers/JettonWallet';
 import { OrderlyAmmDeposit } from '../wrappers/OrderlyAmmDeposit';
+import { OrderlyAmmLiquidityPool } from '../wrappers/OrderlyAmmLp';
 
 describe('OrderlyAmm', () => {
     let blockchain: Blockchain;
@@ -59,8 +61,6 @@ describe('OrderlyAmm', () => {
                 })
             )
         );
-        ownerJettonB = blockchain.openContract(await JettonWallet.fromInit(tokenB.address, owner.address));
-        orderlyJettonB = blockchain.openContract(await JettonWallet.fromInit(tokenB.address, orderlyAmm.address));
 
         const deployer = await blockchain.treasury('deployer');
 
@@ -219,5 +219,36 @@ describe('OrderlyAmm', () => {
         expect(lpDictionaryToObject(lps)).toEqual([
             [0, { $$type: 'LiquidityPool', base: tokenA.address.toRawString(), quote: tokenB.address.toRawString() }],
         ]);
+    });
+
+    it('should add liquidity', async () => {
+        await mintJetton(tokenA, owner, toNano('100'));
+        await mintJetton(tokenB, owner, toNano('100'));
+        await depositJetton(ownerJettonA, owner, toNano('100'), orderlyAmm);
+        await depositJetton(ownerJettonB, owner, toNano('100'), orderlyAmm);
+        await createLp(orderlyAmm, owner, tokenA.address, tokenB.address);
+
+        const res = await addLiquidity(
+            orderlyAmm,
+            owner,
+            tokenA.address,
+            toNano('100'),
+            orderlyJettonA.address,
+            tokenB.address,
+            toNano('100'),
+            orderlyJettonB.address
+        );
+        prettyLogTransactions(res.transactions);
+        printTransactionFees(res.transactions);
+
+        const lp = blockchain.openContract(
+            OrderlyAmmLiquidityPool.fromAddress(await orderlyAmm.getGetLpAddress(tokenA.address, tokenB.address))
+        );
+        const shares = blockchain.openContract(JettonMaster.fromAddress(await lp.getGetSharesAddress()));
+        const sharesWallet = blockchain.openContract(
+            JettonWallet.fromAddress(await shares.getGetWalletAddress(owner.address))
+        );
+        const walletData = await sharesWallet.getGetWalletData();
+        console.log(walletData.balance);
     });
 });

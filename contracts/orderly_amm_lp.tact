@@ -70,6 +70,7 @@ contract OrderlyAmmLiquidityPool with Deployable {
         } else {
             let amount: Int = 0;
             let queryNonNull: PendingQuery = query!!;
+            self.pendingQueries.set(msg.queryId, null);
             if (self.pricePerShare == null) {
                 if (msg.isBase) {
                     self.pricePerShare = queryNonNull.amount * 2;
@@ -101,11 +102,17 @@ contract OrderlyAmmLiquidityPool with Deployable {
                 mode: SendRemainingValue + SendIgnoreErrors,
                 body: Mint {
                     amount: amount,
-                    receiver: msg.from
+                    receiver: msg.from,
+                    responseDestination: msg.responseDestination
                 }.toCell(),
                 code: jmInit.code,
                 data: jmInit.data
             });
         }
+    }
+
+    get fun get_shares_address(): Address {
+        let stateInit: StateInit = initOf JettonMaster(myAddress(), emptyCell());
+        return contractAddress(stateInit);
     }
 }

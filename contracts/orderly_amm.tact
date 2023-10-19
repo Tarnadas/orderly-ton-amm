@@ -5,7 +5,8 @@ import "./orderly_amm_deposit";
 import "./orderly_amm_lp";
 
 contract OrderlyAmm with Deployable {
-    const gasForAddLiquidity: Int = ton("0.1");
+    const gasForAddLiquidity: Int = ton("0.3");
+    const gasConsumptionAddLiquidity: Int = ton("0.06");
 
     owner: Address;
 
@@ -125,14 +126,13 @@ contract OrderlyAmm with Deployable {
             value: 0,
             bounce: false,
             mode: SendRemainingValue + SendIgnoreErrors,
-            body: emptyCell()
+            body: TokenExcesses { queryId: 0 }.toCell()
         });
     }
 
     receive(msg: AddLiquidity) {
         dump("AddLiquidity");
         let ctx: Context = context();
-        require(ctx.sender == self.owner, "Invalid sender");
 
         let queryId: Int = randomInt();
         let lpInit: StateInit = initOf OrderlyAmmLiquidityPool(myAddress(), msg.base, msg.quote);
@@ -168,12 +168,13 @@ contract OrderlyAmm with Deployable {
             }.toCell()
         });
 
+        let value: Int = ctx.value - 2 * self.gasForAddLiquidity - self.gasConsumptionAddLiquidity - ctx.readForwardFee();
         send(SendParameters {
             to: ctx.sender,
-            value: 0,
+            value: value,
             bounce: false,
-            mode: SendRemainingValue + SendIgnoreErrors,
-            body: emptyCell()
+            mode: SendIgnoreErrors,
+            body: TokenExcesses { queryId: 0 }.toCell()
         });
     }
 

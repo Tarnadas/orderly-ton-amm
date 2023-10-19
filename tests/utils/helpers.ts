@@ -26,6 +26,7 @@ export function mintJetton(
             $$type: 'Mint',
             amount,
             receiver: sender.address,
+            responseDestination: sender.address,
         }
     );
 }
@@ -81,6 +82,31 @@ export function createLp(
             $$type: 'CreateLp',
             base,
             quote,
+        }
+    );
+}
+
+export function addLiquidity(
+    amm: SandboxContract<OrderlyAmm>,
+    sender: SandboxContract<TreasuryContract>,
+    base: Address,
+    baseAmount: bigint,
+    baseWallet: Address,
+    quote: Address,
+    quoteAmount: bigint,
+    quoteWallet: Address
+): Promise<SendMessageResult> {
+    return amm.send(
+        sender.getSender(),
+        { value: toNano('1') },
+        {
+            $$type: 'AddLiquidity',
+            base,
+            baseAmount,
+            baseWallet,
+            quote,
+            quoteAmount,
+            quoteWallet,
         }
     );
 }
