@@ -1,51 +1,36 @@
 import "@stdlib/deploy";
-import "@stdlib/ownable";
+
 import "./message";
 import "./jetton_wallet";
 
-contract JettonMaster with Deployable, Ownable {
+contract JettonMaster with Deployable {
     totalSupply: Int as coins;
     owner: Address;
     content: Cell;
-    mintable: Bool;
-    maxSupply: Int as coins;
 
-    init(owner: Address, content: Cell, maxSupply: Int) {
+    init(owner: Address, content: Cell) {
         self.totalSupply = 0;
         self.owner = owner;
-        self.mintable = true;
         self.content = content;
-        self.maxSupply = maxSupply;
     }
 
     receive(msg: Mint) {
+        dump("Mint");
         let ctx: Context = context();
         require(ctx.sender == self.owner, "Not Owner");
-        require(self.mintable, "Can't Mint Anymore");
-        self.mint(msg.receiver, msg.amount, self.owner); // (to, amount, response_destination)
-    }
-
-    receive("Mint: 100") { // Public Minting
-        let ctx: Context = context();
-        require(self.mintable, "Can't Mint Anymore");
-        self.mint(ctx.sender, 100, self.owner); // 🔴 
-    }
-
-    receive("Owner: MintClose") {
-        let ctx: Context = context();
-        require(ctx.sender == self.owner, "Not Owner");
-        self.mintable = false;
+        self.mint(msg.receiver, msg.amount, self.owner); // TODO gas refund
     }
 
     receive(msg: TokenUpdateContent) {
-        self.requireOwner();                // Allow changing content only by owner
-        self.content = msg.content;         // Update content
+        let ctx: Context = context();
+        require(ctx.sender == self.owner, "Not Owner");
+        self.content = msg.content;
     }
 
     receive(msg: TokenBurnNotification) {
-        self.requireSenderAsWalletOwner(msg.response_destination);       // Check wallet
-        self.totalSupply = self.totalSupply - msg.amount; // Update supply
-        if (msg.response_destination != null) { // Cashback
+        self.requireSenderAsWalletOwner(msg.response_destination);
+        self.totalSupply = self.totalSupply - msg.amount;
+        if (msg.response_destination != null) {
             send(SendParameters{
                 to: msg.response_destination, 
                 value: 0,
@@ -61,7 +46,6 @@ contract JettonMaster with Deployable, Ownable {
     // @amount The amount of Jetton token being minted
     // @response_destination The previous owner address
     fun mint(to: Address, amount: Int, response_destination: Address) {
-        require(self.totalSupply + amount <= self.maxSupply, "The total supply will be overlapping.");
         self.totalSupply = self.totalSupply + amount; // Update total supply
 
         let winit: StateInit = self.getJettonWalletInit(to); // Create message
@@ -98,7 +82,7 @@ contract JettonMaster with Deployable, Ownable {
         let code: Cell = self.getJettonWalletInit(myAddress()).code;
         return JettonData { 
             totalSupply: self.totalSupply, 
-            mintable: self.mintable, 
+            mintable: true, 
             owner: self.owner, 
             content: self.content, 
             walletCode: code

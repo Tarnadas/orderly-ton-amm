@@ -1,4 +1,5 @@
 import "@stdlib/deploy";
+
 import "./message";
 
 contract JettonWallet with Deployable {
@@ -22,7 +23,7 @@ contract JettonWallet with Deployable {
         // Gas checks
         let fwdFee: Int = ctx.readForwardFee() + ctx.readForwardFee();  
         let final: Int =  2 * self.gasConsumption + self.minTonsForStorage + fwdFee;
-        require(ctx.value > min(final, ton("0.01")), "Invalid value!!"); 
+        require(ctx.value > min(final, ton("0.01")), "Insufficient gas"); 
 
         // Update balance
         self.balance = self.balance - msg.amount; 

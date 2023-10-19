@@ -1,11 +1,12 @@
 import "@stdlib/deploy";
-import "@stdlib/ownable";
 
 import "./message";
 import "./orderly_amm_deposit";
 import "./orderly_amm_lp";
 
-contract OrderlyAmm with Deployable, Ownable {
+contract OrderlyAmm with Deployable {
+    const gasForAddLiquidity: Int = ton("0.1");
+
     owner: Address;
 
     lps: map<Int as uint16, LiquidityPool>;   
@@ -35,7 +36,7 @@ contract OrderlyAmm with Deployable, Ownable {
                 queryId: msg.queryId,
                 amount: msg.amount,
                 destination: msg.destination,
-                response_destination: ctx.sender,
+                response_destination: msg.responseDestination,
                 custom_payload: null,
                 forward_ton_amount: 0,
                 forward_payload: emptySlice()
@@ -75,7 +76,8 @@ contract OrderlyAmm with Deployable, Ownable {
                 mode: SendRemainingValue + SendIgnoreErrors,
                 body: DepositInternal { 
                     queryId: msg.queryId,
-                    amount: msg.amount
+                    amount: msg.amount,
+                    responseDestination: msg.from
                 }.toCell(),
                 code: stateInit.code,
                 data: stateInit.data
@@ -89,7 +91,8 @@ contract OrderlyAmm with Deployable, Ownable {
     receive(msg: CreateLp) {
         dump("CreateLp");
         let ctx: Context = context();
-        require(ctx.sender == self.owner, "Invalid sender");
+        // TODO permissionless listing ok?
+        // require(ctx.sender == self.owner, "Invalid sender");
 
         let stateInit: StateInit = initOf OrderlyAmmLiquidityPool(myAddress(), msg.base, msg.quote);
         send(SendParameters {
@@ -97,9 +100,8 @@ contract OrderlyAmm with Deployable, Ownable {
             value: 0, 
             bounce: false,
             mode: SendRemainingValue + SendIgnoreErrors,
-            body: CreateLpInternal { 
-                base: msg.base,
-                quote: msg.quote
+            body: CreateLpInternal {
+                responseDestination: ctx.sender
             }.toCell(),
             code: stateInit.code,
             data: stateInit.data
@@ -117,6 +119,62 @@ contract OrderlyAmm with Deployable, Ownable {
             quote: msg.quote
         });
         self.lpsLength = self.lpsLength + 1;
+
+        send(SendParameters {
+            to: msg.responseDestination,
+            value: 0,
+            bounce: false,
+            mode: SendRemainingValue + SendIgnoreErrors,
+            body: emptyCell()
+        });
+    }
+
+    receive(msg: AddLiquidity) {
+        dump("AddLiquidity");
+        let ctx: Context = context();
+        require(ctx.sender == self.owner, "Invalid sender");
+
+        let queryId: Int = randomInt();
+        let lpInit: StateInit = initOf OrderlyAmmLiquidityPool(myAddress(), msg.base, msg.quote);
+        let lpAddress: Address = contractAddress(lpInit);
+
+        let baseInit: StateInit = initOf OrderlyAmmDeposit(myAddress(), ctx.sender, msg.baseWallet);
+        send(SendParameters {
+            to: contractAddress(baseInit),
+            value: self.gasForAddLiquidity,
+            bounce: false,
+            mode: SendIgnoreErrors,
+            body: AddLiquidityInternal {
+                queryId: queryId,
+                amount: msg.baseAmount,
+                lpAddress: lpAddress,
+                isBase: true,
+                responseDestination: ctx.sender
+            }.toCell()
+        });
+
+        let quoteInit: StateInit = initOf OrderlyAmmDeposit(myAddress(), ctx.sender, msg.quoteWallet);
+        send(SendParameters {
+            to: contractAddress(quoteInit),
+            value: self.gasForAddLiquidity,
+            bounce: false,
+            mode: SendIgnoreErrors,
+            body: AddLiquidityInternal {
+                queryId: queryId,
+                amount: msg.quoteAmount,
+                lpAddress: lpAddress,
+                isBase: false,
+                responseDestination: ctx.sender
+            }.toCell()
+        });
+
+        send(SendParameters {
+            to: ctx.sender,
+            value: 0,
+            bounce: false,
+            mode: SendRemainingValue + SendIgnoreErrors,
+            body: emptyCell()
+        });
     }
 
     fun readSwap(msg: Slice): Swap {

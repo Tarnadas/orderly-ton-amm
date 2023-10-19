@@ -76,6 +76,7 @@ struct OrderlyDepositData {
 message(0x12345678) DepositInternal {
     queryId: Int as uint64;
     amount: Int as coins;
+    responseDestination: Address;
 }
 
 message Withdraw {
@@ -92,6 +93,7 @@ message WithdrawInternal {
     amount: Int as coins;
     destination: Address;
     jetton_wallet: Address;
+    responseDestination: Address;
 }
 
 message Swap {
@@ -106,16 +108,47 @@ message CreateLp {
 }
 
 message CreateLpInternal {
-    base: Address;
-    quote: Address;
+    responseDestination: Address;
 }
 
 message CreateLpSuccessInternal {
     base: Address;
     quote: Address;
+    responseDestination: Address;
 }
 
 message LiquidityPool {
     base: Address;
     quote: Address;
+}
+
+message AddLiquidity {
+    base: Address;
+    baseAmount: Int as coins;
+    baseWallet: Address;
+    quote: Address;
+    quoteAmount: Int as coins;
+    quoteWallet: Address;
+}
+
+message AddLiquidityInternal {
+    queryId: Int;
+    amount: Int as coins;
+    lpAddress: Address;
+    isBase: Bool;
+    responseDestination: Address;
+}
+
+message SendLiquidityToLpInternal {
+    amount: Int as coins;
+    queryId: Int;
+    from: Address;
+    jettonWallet: Address;
+    isBase: Bool;
+    responseDestination: Address;
+}
+
+struct PendingQuery {
+    amount: Int as coins;
+    isBase: Bool;
 }

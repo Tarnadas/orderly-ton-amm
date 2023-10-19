@@ -46,8 +46,7 @@ describe('OrderlyAmm', () => {
                 await buildOnchainMetadata({
                     name: 'USD Coin',
                     symbol: 'jUSDC',
-                }),
-                toNano(1_000_000_000)
+                })
             )
         );
 
@@ -57,8 +56,7 @@ describe('OrderlyAmm', () => {
                 await buildOnchainMetadata({
                     name: 'Orderly Token',
                     symbol: 'ORDER',
-                }),
-                toNano(1_000_000_000)
+                })
             )
         );
         ownerJettonB = blockchain.openContract(await JettonWallet.fromInit(tokenB.address, owner.address));

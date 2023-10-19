@@ -28,8 +28,14 @@ contract OrderlyAmmDeposit with Deployable {
 
         self.balance = self.balance + msg.amount;
         require(self.balance >= 0, "Invalid balance"); 
-        
-        self.reply("refund".asComment());
+
+        send(SendParameters {
+            to: msg.responseDestination,
+            value: 0,
+            bounce: false,
+            mode: SendRemainingValue + SendIgnoreErrors,
+            body: emptyCell()
+        });
     }
 
     receive(msg: Withdraw) {
@@ -49,7 +55,8 @@ contract OrderlyAmmDeposit with Deployable {
                 queryId: msg.queryId,
                 amount: msg.amount,
                 destination: self.owner,
-                jetton_wallet: self.jetton_wallet
+                jetton_wallet: self.jetton_wallet,
+                responseDestination: ctx.sender
             }.toCell()
         });
     }
@@ -72,13 +79,52 @@ contract OrderlyAmmDeposit with Deployable {
                 queryId: msg.queryId,
                 amount: amount,
                 destination: self.owner,
-                jetton_wallet: self.jetton_wallet
+                jetton_wallet: self.jetton_wallet,
+                responseDestination: ctx.sender
+            }.toCell()
+        });
+    }
+
+    receive(msg: AddLiquidityInternal) {
+        dump("AddLiquidityInternal");
+        let ctx: Context = context();
+        require(ctx.sender == self.master, "Invalid sender");
+
+        self.balance = self.balance - msg.amount;
+        require(self.balance >= 0, "Invalid balance");
+
+        let queryId: Int = randomInt();
+
+        send(SendParameters {
+            to: msg.lpAddress,
+            value: 0,
+            bounce: true,
+            mode: SendRemainingValue,
+            body: SendLiquidityToLpInternal {
+                queryId: msg.queryId,
+                from: self.owner,
+                jettonWallet: self.jetton_wallet,
+                amount: msg.amount,
+                isBase: msg.isBase,
+                responseDestination: msg.responseDestination
             }.toCell()
         });
     }
 
     bounced(src: bounced<WithdrawInternal>) {
         self.balance = self.balance + src.amount;
+    }
+
+    bounced(src: bounced<SendLiquidityToLpInternal>) {
+        self.balance = self.balance + src.amount;
+        // FIXME doesn't work: https://docs.tact-lang.org/language/guides/bounced#caveats
+        // send(SendParameters {
+        //     to: src.responseDestination,
+        //     value: 0,
+        //     bounce: false,
+        //     mode: SendRemainingValue + SendIgnoreErrors,
+        //     body: emptyCell()
+        // });
     }
 
     get fun get_deposit_data(): OrderlyDepositData {
