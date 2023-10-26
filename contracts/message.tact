@@ -98,9 +98,32 @@ message WithdrawInternal {
 }
 
 message Swap {
-    queryId: Int as uint64;
-    tokenOut: Address;
-    minAmount: Int as coins;
+    // routeLength: Int as uint8;
+    // route: map<Int, RouteEntry>;
+    lpAddress: Address;
+    side: Bool; // true = buy, false = sell
+    minOut: Int as coins;
+}
+
+// struct RouteEntry {
+//     lpAddress: Address;
+//     side: Bool; // true = buy, false = sell
+//     minOut: Int as coins;
+// }
+
+message SwapInternal {
+    amount: Int as coins;
+    lpAddress: Address;
+    side: Bool; // true = buy, false = sell
+    minOut: Int as coins;
+}
+
+message SwapLpInternal {
+    amount: Int as coins;
+    side: Bool; // true = buy, false = sell
+    minOut: Int as coins;
+    from: Address;
+    jettonWallet: Address;
 }
 
 message CreateLp {

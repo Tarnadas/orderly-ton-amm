@@ -2,7 +2,7 @@ import { BlockchainTransaction, SandboxContract, SendMessageResult, TreasuryCont
 import { Address, Cell, Dictionary, beginCell, fromNano, toNano } from 'ton-core';
 import { sha256 } from 'ton-crypto';
 import { JettonWallet } from '../../wrappers/JettonWallet';
-import { LiquidityPool, OrderlyAmm } from '../../wrappers/OrderlyAmm';
+import { LiquidityPool, OrderlyAmm, Swap } from '../../wrappers/OrderlyAmm';
 import { OrderlyAmmDeposit } from '../../wrappers/OrderlyAmmDeposit';
 import { JettonMaster } from '../../wrappers/JettonMaster';
 
@@ -107,6 +107,36 @@ export function addLiquidity(
             quote,
             quoteAmount,
             quoteWallet,
+        }
+    );
+}
+
+export function swap(
+    jettonWallet: SandboxContract<JettonWallet>,
+    sender: SandboxContract<TreasuryContract>,
+    amount: bigint,
+    amm: SandboxContract<OrderlyAmm>,
+    lpAddress: Address,
+    side: boolean,
+    minOut: bigint
+): Promise<SendMessageResult> {
+    return jettonWallet.send(
+        sender.getSender(),
+        { value: toNano('1') },
+        {
+            $$type: 'TokenTransfer',
+            queryId: 0n,
+            amount,
+            destination: amm.address,
+            response_destination: sender.address,
+            custom_payload: null,
+            forward_ton_amount: toNano('0.6'),
+            forward_payload: beginCell()
+                .storeUint(1, 8)
+                .storeAddress(lpAddress)
+                .storeUint(side ? 1 : 0, 1)
+                .storeCoins(minOut)
+                .endCell(),
         }
     );
 }

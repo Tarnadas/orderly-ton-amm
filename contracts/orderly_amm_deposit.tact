@@ -111,13 +111,36 @@ contract OrderlyAmmDeposit with Deployable {
         });
     }
 
+    // receive(msg: SwapInternal) {
+    //     dump("SwapInternal");
+    //     let ctx: Context = context();
+    //     require(ctx.sender == self.master, "Invalid sender");
+
+    //     self.balance = self.balance - msg.amount;
+    //     require(self.balance >= 0, "Invalid balance");
+
+    //     send(SendParameters {
+    //         to: msg.lpAddress,
+    //         value: 0,
+    //         bounce: true,
+    //         mode: SendRemainingValue,
+    //         body: SwapLpInternal {
+    //             amount: msg.amount,
+    //             side: msg.side,
+    //             minOut: msg.minOut,
+    //             from: self.owner,
+    //             jettonWallet: self.jetton_wallet
+    //         }.toCell()
+    //     });
+    // }
+
     bounced(src: bounced<WithdrawInternal>) {
         self.balance = self.balance + src.amount;
     }
 
     bounced(src: bounced<SendLiquidityToLpInternal>) {
         self.balance = self.balance + src.amount;
-        // FIXME doesn't work: https://docs.tact-lang.org/language/guides/bounced#caveats
+        // FIXME gas refund doesn't work: https://docs.tact-lang.org/language/guides/bounced#caveats
         // send(SendParameters {
         //     to: src.responseDestination,
         //     value: 0,
@@ -125,6 +148,10 @@ contract OrderlyAmmDeposit with Deployable {
         //     mode: SendRemainingValue + SendIgnoreErrors,
         //     body: TokenExcesses { queryId: 0 }.toCell()
         // });
+    }
+
+    bounced(src: bounced<SwapLpInternal>) {
+        self.balance = self.balance + src.amount;
     }
 
     get fun get_deposit_data(): OrderlyDepositData {

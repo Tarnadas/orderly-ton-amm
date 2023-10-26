@@ -94,9 +94,9 @@ contract OrderlyAmmLiquidityPool with Deployable {
                 self.quoteAmount = self.quoteAmount + msg.amount;
             }
 
-            let jmInit: StateInit = initOf JettonMaster(myAddress(), emptyCell()); // TODO on-chain metadata
+            let sharesInit: StateInit = initOf JettonMaster(myAddress(), emptyCell()); // TODO on-chain metadata
             send(SendParameters {
-                to: contractAddress(jmInit),
+                to: contractAddress(sharesInit),
                 value: 0, 
                 bounce: false,
                 mode: SendRemainingValue + SendIgnoreErrors,
@@ -105,10 +105,16 @@ contract OrderlyAmmLiquidityPool with Deployable {
                     receiver: msg.from,
                     responseDestination: msg.responseDestination
                 }.toCell(),
-                code: jmInit.code,
-                data: jmInit.data
+                code: sharesInit.code,
+                data: sharesInit.data
             });
         }
+    }
+
+    receive(msg: SwapInternal) {
+        dump("SwapInternal");
+        let ctx: Context = context();
+        require(ctx.sender == self.master, "Invalid sender");
     }
 
     get fun get_shares_address(): Address {

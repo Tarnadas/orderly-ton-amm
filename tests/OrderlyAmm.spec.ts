@@ -1,6 +1,6 @@
 import { Blockchain, SandboxContract, TreasuryContract, printTransactionFees } from '@ton-community/sandbox';
-import { SendMode, beginCell, toNano } from 'ton-core';
-import { LiquidityPool, OrderlyAmm, loadLiquidityPool, storeLiquidityPool } from '../wrappers/OrderlyAmm';
+import { Dictionary, SendMode, beginCell, toNano } from 'ton-core';
+import { LiquidityPool, OrderlyAmm, Swap, loadLiquidityPool, storeLiquidityPool } from '../wrappers/OrderlyAmm';
 import '@ton-community/test-utils';
 import { JettonMaster } from '../wrappers/JettonMaster';
 import {
@@ -12,6 +12,7 @@ import {
     lpDictionaryToObject,
     mintJetton,
     prettyLogTransactions,
+    swap,
     withdrawAllJetton,
 } from './utils/helpers';
 import { JettonWallet } from '../wrappers/JettonWallet';
@@ -249,6 +250,41 @@ describe('OrderlyAmm', () => {
             JettonWallet.fromAddress(await shares.getGetWalletAddress(owner.address))
         );
         const walletData = await sharesWallet.getGetWalletData();
-        console.log(walletData.balance);
+        expect(walletData.balance).toEqual(toNano('1'));
+    });
+
+    it('should swap', async () => {
+        await mintJetton(tokenA, owner, toNano('200'));
+        await mintJetton(tokenB, owner, toNano('100'));
+        await depositJetton(ownerJettonA, owner, toNano('100'), orderlyAmm);
+        await depositJetton(ownerJettonB, owner, toNano('100'), orderlyAmm);
+        await createLp(orderlyAmm, owner, tokenA.address, tokenB.address);
+        await addLiquidity(
+            orderlyAmm,
+            owner,
+            tokenA.address,
+            toNano('100'),
+            orderlyJettonA.address,
+            tokenB.address,
+            toNano('100'),
+            orderlyJettonB.address
+        );
+
+        const lp = blockchain.openContract(
+            OrderlyAmmLiquidityPool.fromAddress(await orderlyAmm.getGetLpAddress(tokenA.address, tokenB.address))
+        );
+        // const shares = blockchain.openContract(JettonMaster.fromAddress(await lp.getGetSharesAddress()));
+        // const sharesWallet = blockchain.openContract(
+        //     JettonWallet.fromAddress(await shares.getGetWalletAddress(owner.address))
+        // );
+        // const walletData = await sharesWallet.getGetWalletData();
+        // expect(walletData.balance).toEqual(toNano('1'));
+
+        // const keys = Dictionary.Keys.BigUint(256);
+        // const route: Swap['route'] = Dictionary.empty(keys, null);
+        // route.set(0n, { $$type: 'RouteEntry', lpAddress: lp.address, side: false, minOut: 0n });
+        const res = await swap(ownerJettonA, owner, toNano('100'), orderlyAmm, lp.address, false, 0n);
+        prettyLogTransactions(res.transactions);
+        printTransactionFees(res.transactions);
     });
 });

@@ -17,36 +17,35 @@ contract JettonWallet with Deployable {
     }
 
     receive(msg: TokenTransfer) {
+        dump("TokenTransfer");
         let ctx: Context = context();
         require(ctx.sender == self.owner, "Invalid sender");
 
-        // Gas checks
         let fwdFee: Int = ctx.readForwardFee() + ctx.readForwardFee();  
         let final: Int =  2 * self.gasConsumption + self.minTonsForStorage + fwdFee;
         require(ctx.value > min(final, ton("0.01")), "Insufficient gas"); 
-
-        // Update balance
+ 
         self.balance = self.balance - msg.amount; 
         require(self.balance >= 0, "Invalid balance");
 
         let stateInit: StateInit = initOf JettonWallet(self.master, msg.destination);  
         let walletAddress: Address = contractAddress(stateInit);
         send(SendParameters {
-                to: walletAddress, 
-                value: 0,
-                mode: SendRemainingValue, 
-                bounce: true,
-                body: TokenTransferInternal {
-                    queryId: msg.queryId,
-                    amount: msg.amount,
-                    from: self.owner,
-                    response_destination: msg.response_destination,
-                    forward_ton_amount: msg.forward_ton_amount,
-                    forward_payload: msg.forward_payload
-                }.toCell(),
-                code: stateInit.code,
-                data: stateInit.data
-            });
+            to: walletAddress, 
+            value: 0,
+            mode: SendRemainingValue, 
+            bounce: true,
+            body: TokenTransferInternal {
+                queryId: msg.queryId,
+                amount: msg.amount,
+                from: self.owner,
+                response_destination: msg.response_destination,
+                forward_ton_amount: msg.forward_ton_amount,
+                forward_payload: msg.forward_payload
+            }.toCell(),
+            code: stateInit.code,
+            data: stateInit.data
+        });
     }
 
     receive(msg: TokenTransferInternal) {

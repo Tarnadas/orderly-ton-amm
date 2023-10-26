@@ -8,6 +8,8 @@ contract OrderlyAmm with Deployable {
     const gasForAddLiquidity: Int = ton("0.3");
     const gasConsumptionAddLiquidity: Int = ton("0.06");
 
+    const gasForSwap: Int = ton("0.15");
+
     owner: Address;
 
     lps: map<Int as uint16, LiquidityPool>;   
@@ -85,7 +87,37 @@ contract OrderlyAmm with Deployable {
             });
         } else if (enum == self.SWAP) {
             let swap: Swap = self.readSwap(msg.forward_payload);
-            // TODO
+            // let i: Int = 0;
+            // while (i < swap.routeLength) {
+            //     let routeEntry: RouteEntry = swap.route.get(i)!!;
+            //     let routeInit: StateInit = initOf OrderlyAmmDeposit(myAddress(), msg.from, ctx.sender);
+            //     send(SendParameters {
+            //         to: contractAddress(routeInit),
+            //         value: self.gasForSwap,
+            //         bounce: false,
+            //         mode: SendIgnoreErrors,
+            //         body: SwapInternal {
+            //             amount: msg.amount,
+            //             lpAddress: routeEntry.lpAddress,
+            //             side: routeEntry.side,
+            //             minOut: routeEntry.minOut
+            //         }.toCell()
+            //     });
+            //     i = i + 1;
+            // }
+            let routeInit: StateInit = initOf OrderlyAmmDeposit(myAddress(), msg.from, ctx.sender);
+            send(SendParameters {
+                to: contractAddress(routeInit),
+                value: self.gasForSwap,
+                bounce: false,
+                mode: SendIgnoreErrors,
+                body: SwapInternal {
+                    amount: msg.amount,
+                    lpAddress: swap.lpAddress,
+                    side: swap.side,
+                    minOut: swap.minOut
+                }.toCell()
+            });
         }
     }
 
@@ -178,11 +210,42 @@ contract OrderlyAmm with Deployable {
         });
     }
 
+    // fun readSwap(msg: Slice): Swap {
+    //     let routeLength: Int = msg.loadUint(8);
+    //     let route: map<Int, RouteEntry> = emptyMap();
+    //     let index: Int = 0;
+    //     while(index < routeLength) {
+    //         let lpAddress: Address = msg.loadAddress();
+    //         let sideInt: Int = msg.loadUint(1);
+    //         let side: Bool = false;
+    //         if (sideInt == 1) {
+    //             side = true;
+    //         }
+    //         let entry: RouteEntry = RouteEntry {
+    //             lpAddress: lpAddress,
+    //             side: side,
+    //             minOut: msg.loadCoins()
+    //         };
+    //         route.set(index, entry);
+    //         index = index + 1;
+    //     }
+    //     return Swap {
+    //         routeLength: routeLength,
+    //         route: route
+    //     };
+    // }
+
     fun readSwap(msg: Slice): Swap {
+        let lpAddress: Address = msg.loadAddress();
+        let sideInt: Int = msg.loadUint(1);
+        let side: Bool = false;
+        if (sideInt == 1) {
+            side = true;
+        }
         return Swap {
-            queryId: msg.loadUint(64),
-            tokenOut: msg.loadAddress(),
-            minAmount: msg.loadCoins()
+            lpAddress: lpAddress,
+            side: side,
+            minOut: msg.loadCoins()
         };
     }
 
