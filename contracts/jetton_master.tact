@@ -17,7 +17,7 @@ contract JettonMaster with Deployable {
     receive(msg: Mint) {
         dump("Mint");
         let ctx: Context = context();
-        require(ctx.sender == self.owner, "Not Owner");
+        // require(ctx.sender == self.owner, "Not Owner");
 
         self.totalSupply = self.totalSupply + msg.amount;
 
